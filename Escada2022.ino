@@ -21,6 +21,10 @@ CRGBArray<NUM_LEDS> leds;
 String MASK = "1010101010";   // máscara - quais leds serão ativados por degrau
 // --
 
+// -- Sensor LDR - luminosidade
+#define LDR_PIN 36      // WiFi ligado. Usar somente as saídas "ADC1" do Esp32
+// ---
+
 struct MyRGB {
   byte r;
   byte g;
@@ -39,6 +43,8 @@ int VELOCIDADE = 1;
 int BRILHO_MAX = 200;
 int PAUSA = 5000;
 MyRGB COLOR = {0, 0, 255};   // blue
+int DAY_LIGHT = 300;
+// ---
 int intervaloTentativaConexaoWiFi = 30000;
 // ---
 
@@ -73,6 +79,11 @@ const char index_html[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <title>Escada Inteligente</title>
+<script>
+  function change(value){
+    document.getElementById("sensor").value=value;
+  }
+</script>
 <style>
   html { 
     font-family: Helvetica; 
@@ -113,6 +124,17 @@ const char index_html[] PROGMEM = R"rawliteral(
     color: white;
   }
 
+  .buttonx {
+    background-color: rgb(255, 255, 255);
+    color: black; 
+    border: 1px solid rgb(54, 86, 121);
+  }
+
+  .buttonx:hover {
+    background-color: rgb(35, 141, 255);
+    color: white;
+  }
+
   .lbl1 {
     font-size: 60%;
     position: relative;
@@ -142,6 +164,10 @@ const char index_html[] PROGMEM = R"rawliteral(
     margin-bottom: 10px;
   }
 
+  .output {
+    font-size: 80%;
+  }
+
 </style>
 </head>
 <body>
@@ -156,7 +182,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       <span class="lbl1">rápido</span>
       <span class="lbl2">lento</span><br><br>
 
-      <label class="text" for="pause">Pausa para apagar:</label>
+      <label class="text" for="pause">Pausa para desligar:</label>
       <input class="ipt" name="pause" id="pause" type="range" min="3000" max="20000" value="@@pause@@">
       <span class="lbl1">menor</span>
       <span class="lbl2">maior</span><br><br>
@@ -166,13 +192,20 @@ const char index_html[] PROGMEM = R"rawliteral(
       <span class="lbl1">menor</span>
       <span class="lbl2">maior</span><br><br>
 
-      luminosidade <br>
+      <label class="text" for="daylight">Sensibilidade da luz natural:</label>
+      <input class="ipt" name="daylight" id="daylight" type="range" min="1" max="1500" oninput="this.nextElementSibling.value = this.value" value="@@daylight@@">
+      <output class="output"></output>
+      <span class="lbl1">menor</span>
+      <span class="lbl2">maior</span><br><br>
 
-      simular sensor1 <br>
-      simular sensor2 <br>
-      simular sensor3 <br>
-
-      <!-- <hr> -->
+      <span>Simular ativação de sensores</span><br>
+      <input type="hidden" id="sensor" name="sensor" value="">
+      <button class="button buttonx" onclick="change(1)">Sensor 1</button>
+      <button class="button buttonx" onclick="change(2)">Sensor 2</button>
+      <button class="button buttonx" onclick="change(3)">Sensor 3</button>
+      <br><br>
+      
+      <span>Luz atual: @@luzatual@@</span>
     </div>
     <button type="submit" class="button button1">Salvar</button>
   </form> 
@@ -232,18 +265,39 @@ void effectAll() {
   }
 }
 
+void simularSensor(int sensor) {
+ if (todasEmStandyBy()) {
+   sensorAtivado = sensor;
+
+    if (sensorAtivado==1) {
+      esc1.prepararEvento(ON, eDirecao::DESCE);
+    } 
+    else
+    if (sensorAtivado==2) {
+      esc2.prepararEvento(ON, eDirecao::SOBE);
+    } 
+    if (sensorAtivado==3) {        
+      esc1.prepararEvento(ON, eDirecao::SOBE);
+      esc2.prepararEvento(ON, eDirecao::DESCE);
+    } 
+  }
+}
 
 void startServer() {
   server.on("/", HTTP_GET, [] (AsyncWebServerRequest *request) {
     String html = index_html;
+    int _simularSensor = 0;    
 
     int paramsCount = request->params();
+
+    html.replace("@@luzatual@@", String(analogRead(LDR_PIN)) );
 
     if (paramsCount == 0) {
       html.replace("@@color_hex@@", rgbToHex());
       html.replace("@@velocity@@", String(VELOCIDADE));
       html.replace("@@pause@@", String(PAUSA));
       html.replace("@@bright@@", String(BRILHO_MAX));
+      html.replace("@@daylight@@", String(DAY_LIGHT));
     }
 
     for(int i=0; i<paramsCount; i++) {
@@ -271,10 +325,24 @@ void startServer() {
         FastLED.setBrightness(BRILHO_MAX);
         html.replace("@@bright@@", p->value());
       }
+      else
+      if (p->name() == "daylight") {
+        DAY_LIGHT = p->value().toInt();
+        html.replace("@@daylight@@", p->value());
+      }
+      else
+      if (p->name() == "sensor") {
+        _simularSensor = p->value().toInt();
+      }      
     }
 
     request->send(200, "text/html", html);
-    effectAll();
+
+    if (_simularSensor >0) {
+      simularSensor(_simularSensor);
+    } else {
+      effectAll();
+    }
   });
 
   server.begin();
@@ -443,12 +511,16 @@ CHSV getHSV(int idx) {
   return corhsv;
 }
 
+bool estaEscuro() {
+  int value = analogRead(LDR_PIN);
+  return  value <= DAY_LIGHT;
+}
 
 void loop() {
   checkWiFi();
 
   if (todasEmStandyBy()) {
-    if (detectouMovimento()) {
+    if (detectouMovimento() && estaEscuro()) {
       if (sensorAtivado==1) {
         esc1.prepararEvento(ON, eDirecao::DESCE);
       } 
@@ -464,7 +536,6 @@ void loop() {
   } else {
     esc1.proximoPasso();
     esc2.proximoPasso();
-
     delay(VELOCIDADE);
   }
 }

@@ -1,8 +1,6 @@
 
 #include <FastLED.h>
 
-blaaaa
-
 #include <WiFi.h>
 #include <AsyncTCP.h>             // https://github.com/me-no-dev/AsyncTCP/archive/master.zip                copiar para: C:\Users\jefer\AppData\Local\Arduino15\packages\esp32\hardware\esp32\1.0.6\libraries
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer/archive/master.zip
@@ -115,24 +113,28 @@ const char index_html[] PROGMEM = R"rawliteral(
     color: white;
   }
 
-  .fast {
+  .lbl1 {
     font-size: 60%;
     position: relative;
-    bottom: -8px;
-    left: -134px;
+    bottom: 5px;
+    right: -10px;
   }
 
-  .slow {
+  .lbl2 {
     font-size: 60%;
     position: relative;
-    bottom: -8px;
-    left: -62px;
+    bottom: 5px;
+    left: 360px;
+  }
+
+  .ipt {
+    width: 100%;
   }
 
   .div-main {
     background-color: rgb(250, 250, 250);
     text-align: left;
-    max-width: 400px;
+    max-width: 420px;
     border-top: solid rgb(160, 160, 160) 1px;
     border-bottom: solid rgb(160, 160, 160) 1px;
     padding: 30px;
@@ -146,33 +148,25 @@ const char index_html[] PROGMEM = R"rawliteral(
   <h1 class="title">Escada Inteligente</h1>
   <form action="/">
     <div class="div-main">
-      <!-- <hr> -->
       <label class="text" for="cor">Selecione a cor da iluminação:</label>
       <input name="color" id="color" type="color" value="@@color_hex@@"><br><br> 
 
-      <div>
-        <label class="text" for="velocity">Velocidade dos passos:</label>
-        <input name="velocity" id="velocity" type="range" min="1" max="2000" value="@@velocity@@">
-        <span class="fast">rápido</span>
-        <span class="slow">lento</span><br><br> 
-      </div>
+      <label class="text" for="velocity">Velocidade dos passos:</label>
+      <input class="ipt" name="velocity" id="velocity" type="range" min="1" max="2000" value="@@velocity@@">
+      <span class="lbl1">rápido</span>
+      <span class="lbl2">lento</span><br><br>
 
-      <div>
-        <label class="text" for="pause">Pausa para apagar:</label>
-        <input name="pause" id="pause" type="range" min="3000" max="20000" value="@@pause@@">
-        <span class="fast">menor</span>
-        <span class="slow">maior</span><br><br> 
-      </div>
+      <label class="text" for="pause">Pausa para apagar:</label>
+      <input class="ipt" name="pause" id="pause" type="range" min="3000" max="20000" value="@@pause@@">
+      <span class="lbl1">menor</span>
+      <span class="lbl2">maior</span><br><br>
 
-      <div>
-        <label class="text" for="bright">Intensidade do brilho dos leds:</label>
-        <input name="bright" id="bright" type="range" min="100" max="220" value="@@bright@@">
-        <span class="fast">menor</span>
-        <span class="slow">maior</span><br><br> 
-      </div>
+      <label class="text" for="bright">Intensidade do brilho:</label>
+      <input class="ipt" name="bright" id="bright" type="range" min="10" max="220" value="@@bright@@">
+      <span class="lbl1">menor</span>
+      <span class="lbl2">maior</span><br><br>
 
       luminosidade <br>
-      brilho <br>
 
       simular sensor1 <br>
       simular sensor2 <br>
@@ -184,7 +178,8 @@ const char index_html[] PROGMEM = R"rawliteral(
   </form> 
 
 </body>
-</html>)rawliteral";
+</html>
+)rawliteral";
 
 
 void toggleLED(byte idxEscada, int idxDegrau)
@@ -216,8 +211,8 @@ String rgbToHex() {
 }
 
 void effectAll() {
-  // esc1.setStandBy();
-  // esc2.setStandBy();
+  esc1.setStandBy();
+  esc2.setStandBy();
 
   for(int x=0; x<NUM_LEDS; x++) {
     leds[x] = CRGB::Black;
@@ -273,6 +268,7 @@ void startServer() {
       else
       if (p->name() == "bright") {
         BRILHO_MAX = p->value().toInt();
+        FastLED.setBrightness(BRILHO_MAX);
         html.replace("@@bright@@", p->value());
       }
     }

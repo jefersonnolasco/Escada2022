@@ -39,10 +39,8 @@ void Escada::prepararEvento(eModo modo_, eDirecao direcao_){
 };
 
 void Escada::setStandBy(){
-  status = eStatus.STANDBY;
+  status = eStatus::STANDBY;
 }
-
-
 
 eStatus Escada::getStatus() { 
   return status; 

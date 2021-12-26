@@ -1,6 +1,8 @@
 
 #include <FastLED.h>
 
+blaaaa
+
 #include <WiFi.h>
 #include <AsyncTCP.h>             // https://github.com/me-no-dev/AsyncTCP/archive/master.zip                copiar para: C:\Users\jefer\AppData\Local\Arduino15\packages\esp32\hardware\esp32\1.0.6\libraries
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer/archive/master.zip

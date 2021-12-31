@@ -6,7 +6,7 @@ class Sensor
 {
 private:
   byte *pins;
-  byte size;
+  byte qty;
   void (*msg)(String txt);
   VL53L0X sensores[3];
 
@@ -15,7 +15,7 @@ private:
   
   boolean checkUniqueSensor(int idx);
 public:
-  Sensor(byte pins[], byte size, void (*msg)(String txt));
+  Sensor(byte pins[], byte qty, void (*msg)(String txt));
   void init();
   int checkSensor();
 };

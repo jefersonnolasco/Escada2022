@@ -1,5 +1,8 @@
-
 #include <FastLED.h>
+
+#include <Arduino.h>
+// #include <Wire.h>
+#include <VL53L0X.h>
 
 #include <WiFi.h>
 #include <AsyncTCP.h>             // https://github.com/me-no-dev/AsyncTCP/archive/master.zip                copiar para: C:\Users\jefer\AppData\Local\Arduino15\packages\esp32\hardware\esp32\1.0.6\libraries
@@ -11,12 +14,12 @@
 // exibe o IP após a conexão.
 
 
-#include "Sensor.h"
+// #include "Sensor.h"
 #include "Escada.h"
 
 // -- Fita LED --
 #define NUM_LEDS 210        // qtde leds na fita
-#define DATA_PIN 32
+#define DATA_PIN 33
 CRGBArray<NUM_LEDS> leds;
 String MASK = "1010101010";   // máscara - quais leds serão ativados por degrau
 // --
@@ -33,8 +36,16 @@ struct MyRGB {
 
 // --- Sensores Ultrassonicos Laser ---
 byte pins[] = {25,26,27};
-byte tam = sizeof(pins)/sizeof(pins[0]);
+int long lastCheckSensor = 0;
+bool pausar_sensor = false;
+
+// // byte pins[] = {25,26,27};
+// // byte tam = sizeof(pins)/sizeof(pins[0]);
 byte sensorAtivado;
+// int intPin = 14;
+// bool newData = false;
+// uint32_t Now = 0;                         // used to calculate integration interval
+// uint32_t lastUpdate = 0, firstUpdate = 0; // used to calculate integration interval
 // --
 
 
@@ -67,7 +78,7 @@ Escada esc2(2 , 140 ,  7 , toggleLED, fimProcesso , message);
 // ---
 
 // ---- Instância : SENSORES ULTRASSONICO
-Sensor sensores(pins, tam, message);
+// Sensor sensores(pins, tam, message);
 // ---
 
 // WebServer server(80);
@@ -384,12 +395,133 @@ void checkWiFi() {
   }
 }
 
+
+
+
+
+
+
+
+
+
+
+// void myinthandler()
+// {
+//   newData = true; // set the new data ready flag to true on interrupt
+// }
+
+// void I2Cscan()
+// {
+// // scan for i2c devices
+//   byte error, address;
+//   int nDevices;
+
+//   Serial.println("Scanning...");
+
+//   nDevices = 0;
+//   for(address = 1; address < 127; address++ ) 
+//   {
+//     // The i2c_scanner uses the return value of
+//     // the Write.endTransmisstion to see if
+//     // a device did acknowledge to the address.
+//     Wire.beginTransmission(address);
+//     error = Wire.endTransmission();
+
+//     if (error == 0)
+//     {
+//       Serial.print("I2C device found at address 0x");
+//       if (address<16) 
+//         Serial.print("0");
+//       Serial.print(address,HEX);
+
+//       nDevices++;
+//     }
+//     else if (error==4) 
+//     {
+//       Serial.print("Unknown error at address 0x");
+//       if (address<16) 
+//         Serial.print("0");
+//       Serial.println(address,HEX);
+//     }    
+//   }
+//   if (nDevices == 0)
+//     Serial.println("No I2C devices found\n");
+//   else
+//     Serial.println("done\n");
+    
+// }
+// VL53L0X sensor;
+// // Uncomment this line to use long range mode. This
+// // increases the sensitivity of the sensor and extends its
+// // potential range, but increases the likelihood of getting
+// // an inaccurate reading because of reflections from objects
+// // other than the intended target. It works best in dark
+// // conditions.
+
+// #define LONG_RANGE
+
+
+// // Uncomment ONE of these two lines to get
+// // - higher speed at the cost of lower accuracy OR
+// // - higher accuracy at the cost of lower speed
+
+// #define HIGH_SPEED
+// //#define HIGH_ACCURACY
+
+
+
 void setup() {
   Serial.begin(9600);
 
   pinMode(LED_BUILTIN, OUTPUT);  // sem WiFi, piscante
 
-  sensores.init();  
+  for(int x=0; x<3; x++) {
+    pinMode(pins[x], INPUT);
+    digitalWrite(pins[x], LOW);
+    delay(50);
+  }
+
+  
+  // Wire.begin(21, 22, 400000); // SDA (21), SCL (22) on ESP32, 400 kHz rate
+  //  I2Cscan();
+  
+  // delay(1000);
+  
+  // sensor.init();
+  // sensor.setTimeout(500);
+  // #if defined LONG_RANGE
+  //   // lower the return signal rate limit (default is 0.25 MCPS)
+  //   sensor.setSignalRateLimit(0.01);   // 0.1
+  //   // increase laser pulse periods (defaults are 14 and 10 PCLKs)
+  //   sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 10);       // 18   (10)
+  //   sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);      // 14
+  // #endif
+
+  // #if defined HIGH_SPEED
+  //   // reduce timing budget to 20 ms (default is about 33 ms)
+  //   sensor.setMeasurementTimingBudget(200000);  // minimum timing budget 20 ms
+  // #elif defined HIGH_ACCURACY  
+  //   // increase timing budget to 200 ms
+  //   sensor.setMeasurementTimingBudget(200000);
+  // #endif
+
+  // // Start continuous back-to-back mode (take readings as
+  // // fast as possible).  To use continuous timed mode
+  // // instead, provide a desired inter-measurement period in
+  // // ms (e.g. sensor.startContinuous(100)).
+  // sensor.startContinuous();
+  // pinMode(intPin, INPUT);
+  // delay(10);
+  // attachInterrupt(intPin, myinthandler, FALLING);  // define interrupt for GPI01 pin output of VL53L0X
+
+
+
+
+
+
+  
+
+  // sensores.init();  
 
   checkWiFi();
   
@@ -414,13 +546,63 @@ void setColor(String cor) {
 bool detectouMovimento() {
   sensorAtivado = 0;
 
-  int resp = sensores.checkSensor();
-  if (resp >= 0 && resp <= 2) {
-    sensorAtivado = resp+1;     
-
-    Serial.println("....sensor "+String(sensorAtivado));
+  if (pausar_sensor) {
+    if (millis()-lastCheckSensor < 10000) {
+Serial.println(".....nao verific.......");
+      return false;
+    }
+    pausar_sensor = false;
   }
+  
+  // lastCheckSensor = millis();
+//   Serial.println("detectou?");
 
+//   int resp = sensores.checkSensor();
+//   if (resp >= 0 && resp <= 2) {
+//     sensorAtivado = resp+1;     
+
+//     Serial.println("....sensor "+String(sensorAtivado));
+//   }
+
+  // long int pausa = 1000;
+
+Serial.print("verificando.........") ;
+  int read = 0;
+
+  for (int x=0; x<3; x++) {
+    delay(10);
+
+    if (digitalRead(pins[x])) {
+      Serial.println("S"+String(x+1));
+      sensorAtivado = x+1;
+      break;
+
+      // delay(500);
+      // sensorAtivado = x+1;
+      // break;
+
+      // long int inicio = millis();
+      // while (millis() - inicio < pausa) {}
+
+      // if (digitalRead(pins[x])) {
+      //   sensorAtivado = x+1;
+      //   break;
+      // }
+      // // int qtd = 0;
+
+      // // while(digitalRead(pins[x])) {
+      // //   qtd++;
+      // // }
+      // // Serial.print("S"+String(x+1)+"-qtd="+String(qtd));
+    }
+  }
+  
+  if (sensorAtivado > 0) {
+    Serial.println("---sensor "+String(sensorAtivado)+"---");
+  } else {
+    Serial.print(".");
+  }
+ 
   return sensorAtivado>0;
 }
 
@@ -448,10 +630,21 @@ void fimProcesso(byte idxEsc) {
   if (processo1) {
     // continuar o processo: acendeu a Esc1 agora acender a Esc2
     esc2.prepararEvento(ON, eDirecao::DESCE);
-  }
+Serial.println("fim processo Nr 1");
+pausar_sensor = true;
+lastCheckSensor = millis();
+  } else
   if (processo2) {
     // continuar o processo: acendeu a Esc2 agora acender a Esc1
     esc1.prepararEvento(ON, eDirecao::SOBE);
+Serial.println("fim processo Nr 2");
+pausar_sensor = true;
+lastCheckSensor = millis();
+  } else {
+Serial.println("fim processo Nr 33333");
+pausar_sensor = true;
+lastCheckSensor = millis();
+
   }
 }
 
@@ -512,30 +705,65 @@ CHSV getHSV(int idx) {
 }
 
 bool estaEscuro() {
-  int value = analogRead(LDR_PIN);
-  return  value <= DAY_LIGHT;
+  // int value = analogRead(LDR_PIN);
+  // return  value <= DAY_LIGHT;
+//jef
+  return true;
 }
 
 void loop() {
-  checkWiFi();
+  // checkWiFi();
+  // detectouMovimento();
+
+
+ 
+//  if (newData) // wait for data ready interrupt
+//   {
+//      newData = false; // reset data ready flag
+//      Now = micros(); // capture interrupt time
+//      // calculate time between last interrupt and current one, convert to sample data rate, and print to serial monitor
+//      Serial.print("data rate = "); Serial.print(1000000./(Now - lastUpdate)); Serial.println(" Hz");
+
+//     long int aa = sensor.readRangeContinuousMillimeters();
+
+//     if (aa < 8000) {
+//      Serial.print(aa); // prit range in mm to serial monitor
+//      if (sensor.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
+//     }
+
+//     Serial.println();
+//   }
+//   lastUpdate = Now;
+
+
+  // delay(100);
+  // Serial.print(".");
+
 
   if (todasEmStandyBy()) {
-    if (detectouMovimento() && estaEscuro()) {
-      if (sensorAtivado==1) {
-        esc1.prepararEvento(ON, eDirecao::DESCE);
+    if (estaEscuro()) {
+      if (detectouMovimento()) {
+        if (sensorAtivado==1) {
+          esc1.prepararEvento(ON, eDirecao::DESCE);
+        } 
+        else
+        if (sensorAtivado==2) {
+          esc2.prepararEvento(ON, eDirecao::SOBE);
+        } 
+        if (sensorAtivado==3) {        
+          esc1.prepararEvento(ON, eDirecao::SOBE);
+          esc2.prepararEvento(ON, eDirecao::DESCE);
+        } 
       } 
-      else
-      if (sensorAtivado==2) {
-        esc2.prepararEvento(ON, eDirecao::SOBE);
-      } 
-      if (sensorAtivado==3) {        
-        esc1.prepararEvento(ON, eDirecao::SOBE);
-        esc2.prepararEvento(ON, eDirecao::DESCE);
-      } 
+        
+      delay(100);
     }
   } else {
     esc1.proximoPasso();
     esc2.proximoPasso();
     delay(VELOCIDADE);
   }
+
+delay(200);
+  Serial.println(".");
 }

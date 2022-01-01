@@ -10,3 +10,12 @@ d) Sensor de distância a laser Vl53l0x  (3 unid)
 
 Escada Um com 14 degraus
 Escada Dois com 7 degraus
+
+
+bibliotecas:
+FastLED by Daniel Garcia v3.4.0
+ESPAsyncTCP by Hristo Gochkov v1.2.2
+ESP Async WebServer by Hristo Gochkov v1.2.3
+
+
+IDE: VSCODE com plugin PlatformIO

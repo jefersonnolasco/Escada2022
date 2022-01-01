@@ -19,3 +19,5 @@ ESP Async WebServer by Hristo Gochkov v1.2.3 <br>
  <br> <br>
 
 IDE: VSCODE com plugin PlatformIO
+
+![guia de pinagem](https://user-images.githubusercontent.com/4014223/147859045-abc46885-52f1-4e9f-90eb-c5fcae59e5bb.jpg)
